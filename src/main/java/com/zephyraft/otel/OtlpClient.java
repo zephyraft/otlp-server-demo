@@ -21,12 +21,11 @@ import io.grpc.Channel;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.StatusRuntimeException;
-import io.grpc.examples.helloworld.GreeterGrpc;
-import io.grpc.examples.helloworld.HelloReply;
-import io.grpc.examples.helloworld.HelloRequest;
 import io.opentelemetry.proto.collector.logs.v1.ExportLogsServiceRequest;
 import io.opentelemetry.proto.collector.logs.v1.ExportLogsServiceResponse;
 import io.opentelemetry.proto.collector.logs.v1.LogsServiceGrpc;
+import io.opentelemetry.proto.collector.metrics.v1.MetricsServiceGrpc;
+import io.opentelemetry.proto.collector.trace.v1.TraceServiceGrpc;
 import io.opentelemetry.proto.common.v1.AnyValue;
 import io.opentelemetry.proto.common.v1.KeyValue;
 import io.opentelemetry.proto.logs.v1.InstrumentationLibraryLogs;
@@ -40,47 +39,26 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * A simple client that requests a greeting from the {@link OtelServer}.
+ * A simple client that requests a greeting from the {@link OtlpServer}.
  */
-public class OtelClient {
-    private static final Logger logger = Logger.getLogger(OtelClient.class.getName());
+public class OtlpClient {
+    private static final Logger logger = Logger.getLogger(OtlpClient.class.getName());
 
-    private final GreeterGrpc.GreeterBlockingStub blockingStub;
     private final LogsServiceGrpc.LogsServiceBlockingStub logsServiceBlockingStub;
+    private final MetricsServiceGrpc.MetricsServiceBlockingStub metricsServiceBlockingStub;
+    private final TraceServiceGrpc.TraceServiceBlockingStub traceServiceBlockingStub;
 
     /**
      * Construct client for accessing HelloWorld server using the existing channel.
      */
-    public OtelClient(Channel channel) {
+    public OtlpClient(Channel channel) {
         // 'channel' here is a Channel, not a ManagedChannel, so it is not this code's responsibility to
         // shut it down.
 
         // Passing Channels to code makes code easier to test and makes it easier to reuse Channels.
-        blockingStub = GreeterGrpc.newBlockingStub(channel);
         logsServiceBlockingStub = LogsServiceGrpc.newBlockingStub(channel);
-    }
-
-    /**
-     * Say hello to server.
-     */
-    public void greet(String name) {
-        logger.info("Will try to greet " + name + " ...");
-        HelloRequest request = HelloRequest.newBuilder().setName(name).build();
-        HelloReply response;
-        try {
-            response = blockingStub.sayHello(request);
-        } catch (StatusRuntimeException e) {
-            logger.log(Level.WARNING, "RPC failed: {0}", e.getStatus());
-            return;
-        }
-        logger.info("Greeting: " + response.getMessage());
-        try {
-            response = blockingStub.sayHelloAgain(request);
-        } catch (StatusRuntimeException e) {
-            logger.log(Level.WARNING, "RPC failed: {0}", e.getStatus());
-            return;
-        }
-        logger.info("Greeting: " + response.getMessage());
+        metricsServiceBlockingStub = MetricsServiceGrpc.newBlockingStub(channel);
+        traceServiceBlockingStub = TraceServiceGrpc.newBlockingStub(channel);
     }
 
     public void log() {
@@ -115,6 +93,7 @@ public class OtelClient {
         ExportLogsServiceRequest request = ExportLogsServiceRequest.newBuilder().addResourceLogs(resourceLogs).build();
         try {
             ExportLogsServiceResponse response = logsServiceBlockingStub.export(request);
+            System.out.println(response.toString());
         } catch (StatusRuntimeException e) {
             logger.log(Level.WARNING, "RPC failed: {0}", e.getStatus());
         }
@@ -125,7 +104,6 @@ public class OtelClient {
      * greeting. The second argument is the target server.
      */
     public static void main(String[] args) throws Exception {
-        String user = "world";
         // Access a service running on the local machine on port 50051
         String target = "localhost:8080";
 
@@ -138,8 +116,7 @@ public class OtelClient {
                 .usePlaintext()
                 .build();
         try {
-            OtelClient client = new OtelClient(channel);
-            client.greet(user);
+            OtlpClient client = new OtlpClient(channel);
             client.log();
         } finally {
             // ManagedChannels use resources like threads and TCP connections. To prevent leaking these
